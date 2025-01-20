@@ -39,6 +39,33 @@
         </sensor>
     </gazebo>
 
+    <!-- Gazebo Tags - Additional -->
+    <gazebo reference="base_link">
+        <material>Gazebo/Black</material>
+    </gazebo>
+
+    <gazebo reference="front_caster">
+        <preserveFixedJoint>true</preserveFixedJoint>
+        <mu1>0</mu1>
+        <mu2>0</mu2>
+    </gazebo>
+
+    <gazebo reference="back_caster">
+        <preserveFixedJoint>true</preserveFixedJoint>
+        <mu1>0</mu1>
+        <mu2>0</mu2>
+    </gazebo>
+
+    <gazebo reference="right_wheel">
+        <mu1>1</mu1>
+        <mu2>1</mu2>
+    </gazebo>
+
+    <gazebo reference="left_wheel">
+        <mu1>1</mu1>
+        <mu2>1</mu2>
+    </gazebo>
+
     <!-- Link - Base Footprint -->
     <link name = "base_footprint">
     </link>
