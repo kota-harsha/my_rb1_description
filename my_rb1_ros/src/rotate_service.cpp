@@ -5,123 +5,72 @@
 #include <cmath>
 
 class RotateService {
-private:
-  ros::NodeHandle nh_;
-  ros::ServiceServer serviceServer_;
-  ros::Publisher pub_;
-  ros::Subscriber sub_;
-  double current_yaw_;
-  bool odom_received_;
+    private:
+        ros::NodeHandle node_handle_;
+        ros::ServiceServer rotate_service_;
+        ros::Publisher velocity_publisher_;
+        ros::Subscriber odom_subscriber_;
+        float current_orientation_z_ = 0.0;
+        float current_orientation_w_ = 0.0;
+        geometry_msgs::Twist twist_command_;
 
-public:
-  RotateService() {
-    current_yaw_ = 0.0;
-    odom_received_ = false;
+    public:
+        RotateService() {
+            rotate_service_ = node_handle_.advertiseService("/rotate_robot", &RotateService::processRotationRequest, this);
 
-    // Initialize the service server
-    serviceServer_ = nh_.advertiseService("/rotate_robot",
-                                          &RotateService::handleRequest, this);
-    // Initialize the subscriber
-    sub_ = nh_.subscribe("/odom", 1000, &RotateService::odomCallback, this);
+            odom_subscriber_ = node_handle_.subscribe("/odom", 1000, &RotateService::odomCallback, this);
 
-    // Initialize the publisher
-    pub_ = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
+            velocity_publisher_ = node_handle_.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
 
-    ROS_INFO("Service Ready");
-  }
-
-  bool handleRequest(my_rb1_ros::Rotate::Request &req,
-                     my_rb1_ros::Rotate::Response &res) {
-
-    ROS_INFO("Service Requested");
-
-    // Wait for odometry data
-    while (!odom_received_) {
-      ros::spinOnce();
-      ros::Duration(0.1).sleep();
-    }
-
-    try {
-      // Get initial angle
-      double start_yaw = current_yaw_;
-      double target_rotation = req.degrees * M_PI / 180.0; // Convert to radians
-      double target_yaw = start_yaw + target_rotation;
-
-      // Normalize target yaw to [-pi, pi]
-      target_yaw = normalizeAngle(target_yaw);
-
-      // Set rotation direction and speed
-      geometry_msgs::Twist cmd;
-      double angular_speed = 0.5; // rad/s
-      cmd.angular.z = (req.degrees > 0) ? angular_speed : -angular_speed;
-
-      ros::Rate rate(10); // 10 Hz
-
-      while (ros::ok()) {
-        double angle_diff = normalizeAngle(target_yaw - current_yaw_);
-
-        // Check if within tolerance
-        if (std::abs(angle_diff) < 0.035) {
-          break;
-        }
-        // Adjust speed
-        if (std::abs(angle_diff) < 0.2) {
-          cmd.angular.z = (angle_diff > 0) ? 0.2 : -0.2;
-        } else {
-          cmd.angular.z = (angle_diff > 0) ? angular_speed : -angular_speed;
+            ROS_INFO("Service server /rotate_robot is ready to use.");
         }
 
-        pub_.publish(cmd);
-        ros::spinOnce();
-        rate.sleep();
-      }
+        bool processRotationRequest(my_rb1_ros::Rotate::Request &request, my_rb1_ros::Rotate::Response &response) {
+            ROS_INFO("Received request at /rotate_robot.");
+            ROS_INFO("Rotating %d degrees.", request.degrees);
 
-      // Stop the robot
-      cmd.angular.z = 0.0;
-      pub_.publish(cmd);
+            try {
+                int initial_angle = getYawInDegrees(current_orientation_z_, current_orientation_w_);
+                int remaining_rotation = std::abs(request.degrees);
 
-      ROS_INFO("Service Completed");
-      res.result = "Rotation completed successfully";
+                twist_command_.angular.z = (request.degrees > 0) ? 0.4 : -0.4;
+                velocity_publisher_.publish(twist_command_);
 
-    } catch (...) {
-      // Stop the robot in case of error
-      geometry_msgs::Twist stop_cmd;
-      stop_cmd.angular.z = 0.0;
-      pub_.publish(stop_cmd);
+                while (remaining_rotation > 0) {
+                    int updated_angle = getYawInDegrees(current_orientation_z_, current_orientation_w_);
+                    if (updated_angle != initial_angle) {
+                        remaining_rotation -= 1;
+                        initial_angle = updated_angle;
+                        ROS_DEBUG("Current angle: %d", initial_angle);
+                    }
+                    ros::spinOnce();
+                }
 
-      res.result = "Rotation failed";
-      return true;
-    }
+                twist_command_.angular.z = 0.0;
+                velocity_publisher_.publish(twist_command_);
 
-    return true;
-  }
+                ROS_INFO("Rotation completed successfully.");
+                response.result = "Rotation completed successfully.";
+            } catch (...) {
+                response.result = "Rotation failed due to an internal error.";
+            }
+            return true;
+        }
 
-  void odomCallback(const nav_msgs::Odometry::ConstPtr &msg) {
-    // Extract yaw angle from quaternion
-    double x = msg->pose.pose.orientation.x;
-    double y = msg->pose.pose.orientation.y;
-    double z = msg->pose.pose.orientation.z;
-    double w = msg->pose.pose.orientation.w;
+        void odomCallback(const nav_msgs::Odometry::ConstPtr& odom_msg) {
+            current_orientation_w_ = odom_msg->pose.pose.orientation.w;
+            current_orientation_z_ = odom_msg->pose.pose.orientation.z;
+        }
 
-    // Convert quaternion to yaw angle
-    current_yaw_ = atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z));
-    odom_received_ = true;
-  }
-
-  double normalizeAngle(double angle) {
-    while (angle > M_PI)
-      angle -= 2.0 * M_PI;
-    while (angle < -M_PI)
-      angle += 2.0 * M_PI;
-    return angle;
-  }
+        int getYawInDegrees(double z, double w) {
+            double angle_rad = 2 * std::atan2(z, w);
+            return static_cast<int>(angle_rad * (180.0 / M_PI));
+        }
 };
 
 int main(int argc, char **argv) {
-  ros::init(argc, argv, "rotate_service_server");
-  RotateService server;
-
-  ros::spin();
-
-  return 0;
+    ros::init(argc, argv, "rotate_service_server");
+    RotateService rotate_service_instance;
+    ros::spin();
+    return 0;
 }
