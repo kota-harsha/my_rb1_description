@@ -1,6 +1,26 @@
 <?xml version="1.0" ?>
 <robot name="RB1">
-    <!-- Gazebo tags - Laser scan -->
+    <!-- Gazebo tags -->
+    <gazebo>
+        <plugin name="differential_drive_controller" filename="libgazebo_ros_diff_drive.so">
+            <updateRate>20</updateRate>
+            <leftJoint>joint_left_wheel</leftJoint>
+            <rightJoint>joint_right_wheel</rightJoint>
+            <wheelSeparation>0.4</wheelSeparation>
+            <wheelDiameter>0.05</wheelDiameter>
+            <wheelAcceleration>1.0</wheelAcceleration>
+            <wheelTorque>10.0</wheelTorque>
+            <commandTopic>cmd_vel</commandTopic>
+            <odometryTopic>odom</odometryTopic>
+            <odometryFrame>odom</odometryFrame>
+            <robotBaseFrame>base_footprint</robotBaseFrame>
+            <publishWheelTF>true</publishWheelTF>
+            <publishOdom>true</publishOdom>
+            <publishWheelJointState>true</publishWheelJointState>
+            <legacyMode>false</legacyMode>
+        </plugin>
+    </gazebo>
+    <!-- Laser scan -->
     <gazebo reference="joint_front_laser">
         <preserveFixedJoint>true</preserveFixedJoint>
     </gazebo>
