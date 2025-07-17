@@ -33,7 +33,8 @@ class RotateService {
                 int initial_angle = getYawInDegrees(current_orientation_z_, current_orientation_w_);
                 int remaining_rotation = std::abs(request.degrees);
 
-                twist_command_.angular.z = (request.degrees > 0) ? 0.4 : -0.4;
+                // twist_command_.angular.z = (request.degrees > 0) ? 0.4 : -0.4; 
+                twist_command_.angular.z = (request.degrees > 0) ? -0.4 : 0.4; 
                 velocity_publisher_.publish(twist_command_);
 
                 while (remaining_rotation > 0) {
